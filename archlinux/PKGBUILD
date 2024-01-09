@@ -1,12 +1,12 @@
-# Maintainer: Trizen <echo dHJpemVuQHByb3Rvbm1haWwuY29tCg== | base64 -d>
+# Maintainer: MikuX-Dev <MikuX_Dev@proton.me>
 
 _pkgname=trizen
 pkgname=trizen-git
-pkgver=1.64.3.gfef9dec
+pkgver=1.64.4
 pkgrel=1
 pkgdesc="Trizen AUR Package Manager: lightweight pacman wrapper and AUR helper (-git version)."
 arch=('any')
-url="https://github.com/trizen/${_pkgname}"
+url="https://github.com/MikuX-Dev/${_pkgname}"
 license=('GPL3')
 
 provides=('trizen')
@@ -31,7 +31,7 @@ optdepends=(
             #'perl-term-readline-gnu: better STDIN support'
            )
 
-source=("git+https://github.com/trizen/${_pkgname}.git")
+source=("git+https://github.com/MikuX-Dev/${_pkgname}.git")
 sha256sums=('SKIP')
 
 pkgver() {
