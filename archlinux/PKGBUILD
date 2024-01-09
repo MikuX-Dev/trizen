@@ -1,10 +1,10 @@
 # Maintainer: MikuX-Dev <MikuX_Dev@proton.me>
 
 _pkgname=trizen
-pkgname=trizen-git
+pkgname=trizen
 pkgver=1.64.4
 pkgrel=1
-pkgdesc="Trizen AUR Package Manager: lightweight pacman wrapper and AUR helper (-git version)."
+pkgdesc="Trizen AUR Package Manager: lightweight pacman wrapper and AUR helper."
 arch=('any')
 url="https://github.com/MikuX-Dev/${_pkgname}"
 license=('GPL3')
@@ -36,7 +36,7 @@ sha256sums=('SKIP')
 
 pkgver() {
     cd "$_pkgname"
-    git describe --always | sed -e 's|-|.|g'
+    date +%d%m%Y
 }
 
 package() {
