@@ -1,8 +1,8 @@
 pkgbase = trizen-git
 	pkgdesc = Trizen AUR Package Manager: lightweight pacman wrapper and AUR helper (-git version).
-	pkgver = 1.64.3.gfef9dec
+	pkgver = 1.64.4
 	pkgrel = 1
-	url = https://github.com/trizen/trizen
+	url = https://github.com/MikuX-Dev/trizen
 	arch = any
 	license = GPL3
 	depends = git
@@ -19,7 +19,7 @@ pkgbase = trizen-git
 	optdepends = perl-json-xs: faster JSON deserialization
 	provides = trizen
 	conflicts = trizen
-	source = git+https://github.com/trizen/trizen.git
+	source = git+https://github.com/MikuX-Dev/trizen.git
 	sha256sums = SKIP
 
 pkgname = trizen-git
