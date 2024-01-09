@@ -151,10 +151,10 @@ my %CONFIG = (
               nocolors                   => 0,
               forcecolors                => 0,
               movepkg                    => 0,
-              noedit                     => 0,
-              noinstall                  => 0,
-              nopull                     => 0,
-              noinfo                     => 0,
+              noedit                     => 1,
+              noinstall                  => 1,
+              nopull                     => 1,
+              noinfo                     => 1,
               skipinteg                  => 0,
               ask_for_retry              => 1,
               lwp_show_progress          => 0,
@@ -174,9 +174,9 @@ my %CONFIG = (
               sudo_autorepeat_interval   => 180,
               sudo_remove_timestamp      => 1,
               makepkg_command            => '/usr/bin/makepkg -scf',
-              movepkg_dir                => '/var/cache/pacman/pkg',
-              pacman_local_dir           => '/var/lib/pacman/local',
-              pacman_command             => '/usr/bin/pacman',
+              movepkg_dir                => '$ENV{HOME}/pkg',
+              yay_local_dir           => '/var/lib/yay/local',
+              yay_command                => '/usr/bin/yay',
               show_diff_only             => 0,
               one_line_edit              => 0,
               show_build_files_content   => 1,
@@ -286,8 +286,8 @@ noinstall                    => bool    Do not install built packages -- builds 
 nopull                       => bool    Do not `git pull` new changes from the AUR git server.
 one_line_edit                => bool    Select one or more build files to view/edit with one-line prompt.
 packages_in_stats            => int     The number of packages to display in `--stats`
-pacman_command               => str     The `pacman` command that is used internally for pacman operations.
-pacman_local_dir             => str     Absolute path to the pacman's local directory.
+yay_command                  => str     The `yay` command that is used internally for yay operations.
+yay_local_dir             => str     Absolute path to the yay's local directory.
 pager_mode                   => bool    Show the build files in pager mode using pager.
 recompute_deps               => bool    Recompute the dependencies of a package (after its build files are inspected / edited).
 show_build_files_content     => bool    Show the content of the build files of a package before building it.
@@ -425,11 +425,11 @@ $c{bgreen}Main options:$c{reset}
     $c{bold}-S$c{reset}, $c{bold}--sync$c{reset}      : install packages (see: $execname -Sh)
     $c{bold}-C$c{reset}, $c{bold}--comments$c{reset}  : display AUR comments for a package
     $c{bold}-G$c{reset}, $c{bold}--get$c{reset}       : clones a package in the current directory
-    $c{bold}-R$c{reset}, $c{bold}--remove$c{reset}    : remove packages from the system (see: pacman -Rh)
-    $c{bold}-Q$c{reset}, $c{bold}--query$c{reset}     : query the package database (see: pacman -Qh)
-    $c{bold}-F$c{reset}, $c{bold}--files$c{reset}     : query the files database (see: pacman -Fh)
-    $c{bold}-D$c{reset}, $c{bold}--database$c{reset}  : operate on the package database (see: pacman -Dh)
-    $c{bold}-T$c{reset}, $c{bold}--deptest$c{reset}   : check dependencies (see: pacman -Th)
+    $c{bold}-R$c{reset}, $c{bold}--remove$c{reset}    : remove packages from the system (see: yay -Rh)
+    $c{bold}-Q$c{reset}, $c{bold}--query$c{reset}     : query the package database (see: yay -Qh)
+    $c{bold}-F$c{reset}, $c{bold}--files$c{reset}     : query the files database (see: yay -Fh)
+    $c{bold}-D$c{reset}, $c{bold}--database$c{reset}  : operate on the package database (see: yay -Dh)
+    $c{bold}-T$c{reset}, $c{bold}--deptest$c{reset}   : check dependencies (see: yay -Th)
     $c{bold}-U$c{reset}, $c{bold}--upgrade$c{reset}   : install built packages from $lconfig{clone_dir} or `pwd`
 
 $c{bgreen}Other options:$c{reset}
@@ -467,7 +467,7 @@ $c{bgreen}Main options:$c{reset}
   $c{bold}-l$c{reset}, $c{bold}--local$c{reset}         : build and install packages from `pwd`
   $c{bold}-u$c{reset}, $c{bold}--sysupgrade$c{reset}    : upgrade installed packages
   $c{bold}-y$c{reset}, $c{bold}--refresh$c{reset}       : refresh package databases (with: -u)
-  $c{bold}-c$c{reset}, $c{bold}--clean$c{reset}         : clean the cache directory of `$execname` and `pacman`
+  $c{bold}-c$c{reset}, $c{bold}--clean$c{reset}         : clean the cache directory of `$execname` and `yay`
   $c{bold}-a$c{reset}, $c{bold}--aur$c{reset}           : only AUR operations (with: -c, -u, -s, -i)
 
 $c{bgreen}Other options:$c{reset}
@@ -484,7 +484,7 @@ $c{bgreen}Other options:$c{reset}
       $c{bold}--asexplicit$c{reset}    : install packages as explicitly installed
       $c{bold}--skipinteg$c{reset}     : pass the `--skipinteg` argument to `makepkg`
       $c{bold}--noconfirm$c{reset}     : do not ask for any confirmation
-      $c{bold}--movepkg$c{reset}       : move built packages into pacman's cache directory
+      $c{bold}--movepkg$c{reset}       : move built packages into ~/pkg directory
       $c{bold}--movepkg-dir=s$c{reset} : move built packages in this directory (implies --movepkg)
       $c{bold}--clone-dir=s$c{reset}   : directory where to clone and build packages
       $c{bold}--editor=s$c{reset}      : editor command used to edit build files
@@ -859,7 +859,7 @@ EOC
     return @comments;
 }
 
-sub get_pacman_arguments ($type, @options) {
+sub get_yay_arguments ($type, @options) {
 
     my @args;
 
@@ -881,13 +881,13 @@ sub get_pacman_arguments ($type, @options) {
     return @args;
 }
 
-sub execute_pacman_command ($needs_root, @cmd) {
+sub execute_yay_command ($needs_root, @cmd) {
 
-    my $pacman_command = join(
+    my $yay_command = join(
         q{ },
         do {
             my %seen;
-            ($lconfig{pacman_command}, grep { (/^\w/ || /^--[A-Z]/) ? !$seen{$_}++ : 1 } map { quotemeta($_) } @cmd);
+            ($lconfig{yay_command}, grep { (/^\w/ || /^--[A-Z]/) ? !$seen{$_}++ : 1 } map { quotemeta($_) } @cmd);
         }
     );
 
@@ -898,20 +898,20 @@ sub execute_pacman_command ($needs_root, @cmd) {
         start_sudo_autorepeat();
     }
 
-    my $user_pacman_command = (
+    my $user_yay_command = (
                                  $needs_root
                                ? $lconfig{use_sudo}
-                                     ? "$lconfig{sudo_command} $pacman_command"
-                                     : qq{$lconfig{su_command} "$pacman_command"}
-                               : $pacman_command
+                                     ? "$lconfig{sudo_command} $yay_command"
+                                     : qq{$lconfig{su_command} "$yay_command"}
+                               : $yay_command
                               );
 
     if ($lconfig{debug} or $needs_root) {
-        msg(":: $c{bold}Pacman command: " . ($user_pacman_command =~ s/\\(.)/$1/gr));
+        msg(":: $c{bold}yay command: " . ($user_yay_command =~ s/\\(.)/$1/gr));
     }
 
     {
-        system($lconfig{as_root} ? $pacman_command : $user_pacman_command);
+        system($lconfig{as_root} ? $yay_command : $user_yay_command);
 
         if ($? and $needs_root) {
 
@@ -927,9 +927,9 @@ sub execute_pacman_command ($needs_root, @cmd) {
     return $? ? 0 : 1;
 }
 
-sub is_available_in_pacman_repo ($pkgname) {
+sub is_available_in_yay_repo ($pkgname) {
 
-    my $output = `$lconfig{pacman_command} -Sp \Q$pkgname\E > /dev/stdout 2>&1`;
+    my $output = `$lconfig{yay_command} -Sp \Q$pkgname\E > /dev/stdout 2>&1`;
 
     # In repo if the output has at least two lines
     if ($output =~ /.\R:: /) {
@@ -950,7 +950,7 @@ sub package_is_installed ($pkgname, $strict = 1) {
     }
     else {
 
-        if (opendir(my $dir_h, $lconfig{pacman_local_dir})) {
+        if (opendir(my $dir_h, $lconfig{yay_local_dir})) {
 
             # Performance optimization when $strict is true
             if ($strict) {
@@ -979,7 +979,7 @@ sub package_is_installed ($pkgname, $strict = 1) {
         }
 
         if (not keys(%$installed_packages)) {
-            %$installed_packages = map { split(' ', $_) } `$lconfig{pacman_command} -Q`;
+            %$installed_packages = map { split(' ', $_) } `$lconfig{yay_command} -Q`;
         }
 
         # Cache the installed packages
@@ -994,7 +994,7 @@ sub package_is_installed ($pkgname, $strict = 1) {
 }
 
 sub package_is_provided ($pkgname) {
-    chomp(my $deptest = `$lconfig{pacman_command} -T \Q$pkgname\E`);
+    chomp(my $deptest = `$lconfig{yay_command} -T \Q$pkgname\E`);
     return ($deptest eq '');
 }
 
@@ -1162,7 +1162,7 @@ sub color_code_dependencies ($deps) {
         if (package_is_provided($pkgname)) {
             push @installed_packages, "$c{bgreen}$pkgname$c{reset}";
         }
-        elsif (is_available_in_pacman_repo($pkgname)) {
+        elsif (is_available_in_yay_repo($pkgname)) {
             push @repo_packages, "$c{bcyan}$pkgname$c{reset}";
         }
         else {
@@ -1477,7 +1477,7 @@ sub run_makepkg_command ($pkg, @args) {
     return 1;
 }
 
-sub install_local_package ($name, $tarball, @pacman_args) {
+sub install_local_package ($name, $tarball, @yay_args) {
 
     return 1 if $already_installed{lc $name};
 
@@ -1491,8 +1491,8 @@ sub install_local_package ($name, $tarball, @pacman_args) {
         return 1;
     }
 
-    # Install package with pacman
-    if (execute_pacman_command(1, $tarball, @pacman_args)) {
+    # Install package with yay
+    if (execute_yay_command(1, $tarball, @yay_args)) {
 
         # Mark package as installed
         $already_installed{lc $name} = 1;
@@ -1508,12 +1508,12 @@ sub install_local_package ($name, $tarball, @pacman_args) {
     return;
 }
 
-sub install_local_packages ($packages, $pacman_args) {
+sub install_local_packages ($packages, $yay_args) {
 
     # Redirect to the main `install_local_package()` in `--noinstall` mode
     if ($lconfig{noinstall}) {
         foreach my $name (keys %$packages) {
-            install_local_package($name, $packages->{$name}, @$pacman_args);
+            install_local_package($name, $packages->{$name}, @$yay_args);
         }
         return 1;
     }
@@ -1524,8 +1524,8 @@ sub install_local_packages ($packages, $pacman_args) {
     # Return early when there are no packages to install
     return 1 if not @packages_to_install;
 
-    # Install multiple packages with a single pacman command
-    if (execute_pacman_command(1, @{$packages}{@packages_to_install}, @$pacman_args)) {
+    # Install multiple packages with a single yay command
+    if (execute_yay_command(1, @{$packages}{@packages_to_install}, @$yay_args)) {
 
         # Mark packages as installed
         foreach my $name (@packages_to_install) {
@@ -1655,7 +1655,7 @@ sub is_vcs_package ($pkg) {
 }
 
 sub install_packages_from_repo (@pkgs) {
-    my @args = ('-S', get_pacman_arguments('long', qw(noconfirm needed quiet)));
+    my @args = ('-S', get_yay_arguments('long', qw(noconfirm needed quiet)));
 
     if ($lconfig{asdeps}) {
         push @args, '--asdeps';
@@ -1664,7 +1664,7 @@ sub install_packages_from_repo (@pkgs) {
         push @args, '--asexplicit';
     }
 
-    return execute_pacman_command(1, @args, @pkgs);
+    return execute_yay_command(1, @args, @pkgs);
 }
 
 sub install_dependency ($name) {
@@ -1696,8 +1696,8 @@ sub install_package ($pkg) {
     if (ref($info) eq 'HASH') {
         msg(":: <<$pkg>> exists in AUR!") if $lconfig{debug};
     }
-    elsif (not($lconfig{aur}) and is_available_in_pacman_repo($pkg)) {
-        msg(":: <<$pkg>> is available in pacman's repository...") if $lconfig{debug};
+    elsif (not($lconfig{aur}) and is_available_in_yay_repo($pkg)) {
+        msg(":: <<$pkg>> is available in yay's repository...") if $lconfig{debug};
         return install_packages_from_repo($pkg);
     }
     else {
@@ -1748,7 +1748,7 @@ sub install_package ($pkg) {
         }
     }
 
-    my @args = get_pacman_arguments('long', qw(noconfirm needed));
+    my @args = get_yay_arguments('long', qw(noconfirm needed));
 
     # Package will be installed as dependency
     if ($lconfig{asdeps}) {
@@ -1852,8 +1852,8 @@ sub install_package ($pkg) {
                 msg(":: Dependency <<$name>> is already installed -- skipping") if $lconfig{debug};
             }
         }
-        elsif (is_available_in_pacman_repo($pkgname)) {
-            msg(":: Dependency <<$name>> is available in pacman's repository -- skipping") if $lconfig{debug};
+        elsif (is_available_in_yay_repo($pkgname)) {
+            msg(":: Dependency <<$name>> is available in yay's repository -- skipping") if $lconfig{debug};
         }
         else {
 
@@ -1882,7 +1882,7 @@ sub install_package ($pkg) {
 sub clean_cache () {
 
     if (!$lconfig{aur}) {
-        execute_pacman_command(1, get_pacman_arguments('all', qw(sync clean noconfirm quiet)));
+        execute_yay_command(1, get_yay_arguments('all', qw(sync clean noconfirm quiet)));
     }
 
     if ($lconfig{regular} or $lconfig{r}) {
@@ -2077,8 +2077,8 @@ sub search_repo_packages (@keywords) {
 
     @keywords = map { quotemeta($_) } @keywords;
 
-    my @pacman_args = get_pacman_arguments('long');
-    my @lines       = split(/\n/, decode_utf8(scalar `$lconfig{pacman_command} -Ss @pacman_args @keywords`));
+    my @yay_args = get_yay_arguments('long');
+    my @lines       = split(/\n/, decode_utf8(scalar `$lconfig{yay_command} -Ss @yay_args @keywords`));
 
     my @results;
 
@@ -2104,7 +2104,7 @@ sub search_repo_packages (@keywords) {
               };
         }
         else {
-            note(":: Unable to parse pacman result: $pkgline");
+            note(":: Unable to parse yay result: $pkgline");
         }
     }
 
@@ -2244,7 +2244,7 @@ sub read_local_desc_file ($pkgname, $version = undef) {
 
     $version //= package_is_installed($pkgname) // return;
 
-    my $desc_file = catfile($lconfig{pacman_local_dir}, "$pkgname-$version", 'desc');
+    my $desc_file = catfile($lconfig{yay_local_dir}, "$pkgname-$version", 'desc');
 
     if (not -f $desc_file) {
         note(":: <<$desc_file>> is not a file: {!$!!}");
@@ -2458,8 +2458,8 @@ sub update_local_packages (@repo_packages) {
 
 #<<<
     if (not $lconfig{aur}) {
-        execute_pacman_command(1, @repo_packages,
-            get_pacman_arguments('all', qw(sync needed asdeps asexplicit sysupgrade noconfirm quiet refresh)),
+        execute_yay_command(1, @repo_packages,
+            get_yay_arguments('all', qw(sync needed asdeps asexplicit sysupgrade noconfirm quiet refresh)),
             map { "--ignore=$_" } keys(%ignored_pkgs)
         );
     }
@@ -2469,7 +2469,7 @@ sub update_local_packages (@repo_packages) {
         return 1;
     }
 
-    my %packages = map { @$_ } grep { scalar(@$_) == 2 } map { [split(' ', $_)] } `$lconfig{pacman_command} -Qm`;
+    my %packages = map { @$_ } grep { scalar(@$_) == 2 } map { [split(' ', $_)] } `$lconfig{yay_command} -Qm`;
     my @pkgnames = sort keys %packages;
 
     my %exists_in_aur;
@@ -2508,7 +2508,7 @@ sub update_local_packages (@repo_packages) {
         my $pkgname = $result->{Name};
         my $version = $result->{Version};
 
-        # Ignore packages that exist in AUR but not in pacman -Qm
+        # Ignore packages that exist in AUR but not in yay -Qm
         # https://github.com/trizen/trizen/issues/231
         exists($packages{$pkgname}) or next;
 
@@ -2684,8 +2684,8 @@ sub update_local_packages (@repo_packages) {
 
 sub show_stats {
 
-    opendir my $dir_h, $lconfig{pacman_local_dir}
-      or error(":: Unable to open directory <<$lconfig{pacman_local_dir}>>: {!$!!}");
+    opendir my $dir_h, $lconfig{yay_local_dir}
+      or error(":: Unable to open directory <<$lconfig{yay_local_dir}>>: {!$!!}");
 
     my ($total_size, $num_of_pkgs, %dependencies, %reason_deps);
 
@@ -2812,7 +2812,7 @@ if ($lconfig{S} or $lconfig{sync}) {    # -S
     }
 
     if ($lconfig{list}) {
-        execute_pacman_command(0, get_pacman_arguments('all', qw(list)), splice(@keyword_arguments));
+        execute_yay_command(0, get_yay_arguments('all', qw(list)), splice(@keyword_arguments));
     }
 
     if ($lconfig{h} or $lconfig{help}) {     # -Sh
@@ -2832,8 +2832,8 @@ if ($lconfig{S} or $lconfig{sync}) {    # -S
 
             local $lconfig{aur} = 1 if _parse_pkgname(\$pkg);
 
-            if (!$lconfig{aur} && is_available_in_pacman_repo($pkg)) {
-                execute_pacman_command(0, get_pacman_arguments('all', qw(info sync)), $pkg);
+            if (!$lconfig{aur} && is_available_in_yay_repo($pkg)) {
+                execute_yay_command(0, get_yay_arguments('all', qw(info sync)), $pkg);
             }
             else {
                 my $info = info_for_package($pkg) // do {
@@ -2862,8 +2862,8 @@ if ($lconfig{S} or $lconfig{sync}) {    # -S
         foreach my $pkg (splice @keyword_arguments) {
 
             # For repo packages, display the download URL only
-            if (is_available_in_pacman_repo($pkg)) {
-                execute_pacman_command(0, get_pacman_arguments('all', qw(sync print)), $pkg);
+            if (is_available_in_yay_repo($pkg)) {
+                execute_yay_command(0, get_yay_arguments('all', qw(sync print)), $pkg);
                 next;
             }
 
@@ -2914,7 +2914,7 @@ if ($lconfig{S} or $lconfig{sync}) {    # -S
     foreach my $pkg (splice @keyword_arguments) {
         local $lconfig{aur} = 1 if _parse_pkgname(\$pkg);
 
-        if (!$lconfig{aur} and is_available_in_pacman_repo($pkg)) {
+        if (!$lconfig{aur} and is_available_in_yay_repo($pkg)) {
             push @repo_packages, $pkg;
         }
         else {
@@ -2927,8 +2927,8 @@ if ($lconfig{S} or $lconfig{sync}) {    # -S
     }
 
     elsif ($lconfig{y} or $lconfig{refresh}) {    # -Sy
-        execute_pacman_command(1, splice(@repo_packages),
-                               get_pacman_arguments('all', qw(sync needed asdeps asexplicit refresh quiet noconfirm)));
+        execute_yay_command(1, splice(@repo_packages),
+                               get_yay_arguments('all', qw(sync needed asdeps asexplicit refresh quiet noconfirm)));
     }
 
     install_packages_from_repo(@repo_packages) if @repo_packages;
@@ -3004,12 +3004,12 @@ elsif ($lconfig{G} or $lconfig{get}) {    # -G
 elsif ($lconfig{U} or $lconfig{upgrade}) {    # -U
 
     if ($lconfig{h} or $lconfig{help}) {
-        execute_pacman_command(0, '-Uh');
+        execute_yay_command(0, '-Uh');
         main_quit();
     }
 
     my @packages;
-    my @args = get_pacman_arguments('all', qw(upgrade asdeps asexplicit noconfirm needed));
+    my @args = get_yay_arguments('all', qw(upgrade asdeps asexplicit noconfirm needed));
 
   OUTER_LOOP: foreach my $pkg (@keyword_arguments) {
 
@@ -3047,7 +3047,7 @@ elsif ($lconfig{U} or $lconfig{upgrade}) {    # -U
     }
 
     if (@packages) {
-        execute_pacman_command(1, @args, @packages);
+        execute_yay_command(1, @args, @packages);
     }
     else {
         exit 2;
@@ -3056,48 +3056,48 @@ elsif ($lconfig{U} or $lconfig{upgrade}) {    # -U
 elsif ($lconfig{R} or $lconfig{remove}) {    # -R
 
     if ($lconfig{h} or $lconfig{help}) {
-        execute_pacman_command(0, '-Rh');
+        execute_yay_command(0, '-Rh');
         main_quit();
     }
 
-    execute_pacman_command(1, get_pacman_arguments('all', qw(remove noconfirm)), @keyword_arguments);
+    execute_yay_command(1, get_yay_arguments('all', qw(remove noconfirm)), @keyword_arguments);
 }
 elsif ($lconfig{D} or $lconfig{database}) {    # -D
 
     if ($lconfig{h} or $lconfig{help}) {
-        execute_pacman_command(0, '-Dh');
+        execute_yay_command(0, '-Dh');
         main_quit();
     }
 
-    my @args = (get_pacman_arguments('all', qw(database asdeps asexplicit check noconfirm)), @keyword_arguments);
+    my @args = (get_yay_arguments('all', qw(database asdeps asexplicit check noconfirm)), @keyword_arguments);
 
     if ($lconfig{k} or $lconfig{check}) {
-        execute_pacman_command(0, @args);
+        execute_yay_command(0, @args);
     }
     else {
-        execute_pacman_command(1, @args);
+        execute_yay_command(1, @args);
     }
 }
 elsif ($lconfig{F} or $lconfig{files}) {    # -F
 
     if ($lconfig{h} or $lconfig{help}) {
-        execute_pacman_command(0, '-Fh');
+        execute_yay_command(0, '-Fh');
         main_quit();
     }
 
-    my @args = (get_pacman_arguments('all', qw(files quiet search list refresh noconfirm regex)), @keyword_arguments);
+    my @args = (get_yay_arguments('all', qw(files quiet search list refresh noconfirm regex)), @keyword_arguments);
 
     if ($lconfig{y} or $lconfig{refresh}) {
-        execute_pacman_command(1, @args);
+        execute_yay_command(1, @args);
     }
     else {
-        execute_pacman_command(0, @args);
+        execute_yay_command(0, @args);
     }
 }
 elsif ($lconfig{Q} or $lconfig{query}) {    # -Q
 
     if ($lconfig{h} or $lconfig{help}) {
-        execute_pacman_command(0, '-Qh');
+        execute_yay_command(0, '-Qh');
         main_quit();
     }
 
@@ -3111,18 +3111,18 @@ elsif ($lconfig{Q} or $lconfig{query}) {    # -Q
     }
     else {
 #<<<
-        execute_pacman_command(0, get_pacman_arguments('all', qw(query foreign check search info list quiet noconfirm upgrades)), @keyword_arguments);
+        execute_yay_command(0, get_yay_arguments('all', qw(query foreign check search info list quiet noconfirm upgrades)), @keyword_arguments);
 #>>>
     }
 }
 elsif ($lconfig{T} or $lconfig{deptest}) {    # -T
 
     if ($lconfig{h} or $lconfig{help}) {
-        execute_pacman_command(0, '-Th');
+        execute_yay_command(0, '-Th');
         main_quit();
     }
 
-    execute_pacman_command(0, get_pacman_arguments('all', qw(deptest noconfirm)), @keyword_arguments);
+    execute_yay_command(0, get_yay_arguments('all', qw(deptest noconfirm)), @keyword_arguments);
 }
 elsif ($lconfig{h} or $lconfig{help}) {
     help();
